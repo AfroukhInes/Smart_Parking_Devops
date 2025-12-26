@@ -5,7 +5,7 @@ pipeline {
 
     stage('Clone') {
       steps {
-        git branch: 'main', url: 'https://github.com/TON-REPO.git'
+        git branch: 'main', url: 'https://github.com/AfroukhInes/Parking_Devops_Project.git'
       }
     }
 
