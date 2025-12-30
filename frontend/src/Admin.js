@@ -7,7 +7,7 @@ export default function Admin() {
 
   useEffect(() => {
 
-    fetch("http://localhost:3002/admin")
+    fetch("http://localhost:32002/admin")
       .then(r => r.json())
       .then(data => {
 

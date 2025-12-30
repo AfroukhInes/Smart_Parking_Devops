@@ -13,7 +13,7 @@ export default function User() {
   const [showPopup, setShowPopup] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:3002/spots/free")
+    fetch("http://localhost:32002/spots/free")
       .then(r => r.json())
       .then(setSpots);
   }, []);
@@ -25,7 +25,7 @@ export default function User() {
 
     const interval = setInterval(async () => {
 
-      const res = await fetch(`http://localhost:3002/reservation/${code}`);
+      const res = await fetch(`http://localhost:32002/reservation/${code}`);
       const data = await res.json();
 
       if (data.reminderSent && !data.entryTime && !data.cancelled && !data.confirmed) {
@@ -43,7 +43,7 @@ export default function User() {
   async function reserve(e) {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:3002/reserve", {
+    const res = await fetch("http://localhost:32002/reserve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -65,7 +65,7 @@ export default function User() {
   }
 
   async function confirmArrival() {
-    await fetch(`http://localhost:3002/confirm/${code}`, {
+    await fetch(`http://localhost:32002/confirm/${code}`, {
       method: "POST"
     });
 
@@ -74,7 +74,7 @@ export default function User() {
   }
 
   async function cancelReservation() {
-    await fetch(`http://localhost:3002/cancel/${code}`, {
+    await fetch(`http://localhost:32002/cancel/${code}`, {
       method: "POST"
     });
 

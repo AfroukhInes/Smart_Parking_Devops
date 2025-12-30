@@ -10,7 +10,7 @@ export default function Agent() {
     setError("");
     setBill(null);
 
-    const res = await fetch(`http://localhost:3002/entry/${code}`, {
+    const res = await fetch(`http://localhost:32002/entry/${code}`, {
       method: "POST"
     });
 
@@ -23,7 +23,7 @@ export default function Agent() {
   async function exit() {
     setError("");
 
-    const res = await fetch(`http://localhost:3002/exit/${code}`, {
+    const res = await fetch(`http://localhost:32002/exit/${code}`, {
       method: "POST"
     });
 
