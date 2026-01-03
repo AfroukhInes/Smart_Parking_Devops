@@ -15,3 +15,9 @@ export const ENDPOINTS = {
   pay: `${BILLING_API}/pay`,
   notify: `${NOTIFICATION_API}/send`
 };
+
+// 🔥 compatibility exports (fix Jenkins error)
+export const AUTH = AUTH_API;
+export const RESERVATION = RESERVATION_API;
+export const BILLING = BILLING_API;
+export const NOTIFICATION = NOTIFICATION_API;
