@@ -1,219 +1,164 @@
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
-const PDFDocument = require("pdfkit");
-const QRCode = require("qrcode");
+const crypto = require("crypto");
+const fetch = require("node-fetch");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ------------------ PLACES ------------------
+// ------------------ IN MEMORY DATA ------------------
+
 let spots = [
   { id: 1, section: "A", number: 1, floor: 0, free: true },
   { id: 2, section: "A", number: 2, floor: 0, free: true },
-  { id: 3, section: "A", number: 3, floor: 1, free: true },
-  { id: 4, section: "B", number: 1, floor: 0, free: true },
-  { id: 5, section: "B", number: 2, floor: 1, free: true }
+  { id: 3, section: "B", number: 3, floor: 1, free: true },
+  { id: 4, section: "C", number: 1, floor: 1, free: true }
 ];
 
-// ------------------ RESERVATIONS ------------------
 let reservations = [];
 
-const uploadDir = path.join(__dirname, "tickets");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+// ------------------ HELPERS ------------------
 
-// code aléatoire
 function createCode() {
-  return Math.random().toString(16).slice(2, 10);
+  return crypto.randomBytes(4).toString("hex").toUpperCase();
 }
 
-// ------------------ LISTE DES PLACES LIBRES ------------------
+// ------------------ LICENSE PLATE VALIDATION ------------------
+
+// Algérie format courant:
+// 12345 - 123 - 16
+const dzPlate = /^[0-9]{5}-[0-9]{3}-[0-9]{2}$/;
+
+// formes étrangères — plus générales
+const internationalPlate = /^[A-Z0-9\- ]{4,12}$/;
+
+function validatePlate(carNumber) {
+  return dzPlate.test(carNumber) || internationalPlate.test(carNumber);
+}
+
+// ------------------ FREE SPOTS ------------------
+
 app.get("/spots/free", (req, res) => {
   res.json(spots.filter(s => s.free));
 });
 
-// ------------------ RESERVER ------------------
+// ------------------ RESERVE ------------------
+
 app.post("/reserve", async (req, res) => {
-  const { name, carNumber, spotId } = req.body;
+  try {
+    const { userId, name, carNumber, spotId } = req.body;
 
-  const spot = spots.find(s => s.id == spotId);
-  if (!spot) return res.status(404).json({ error: "place introuvable" });
-  if (!spot.free) return res.status(400).json({ error: "place déjà réservée" });
+    if (!userId) return res.status(400).json({ error: "auth manquante" });
 
-  spot.free = false;
+    if (!validatePlate(carNumber)) {
+      return res.status(400).json({
+        error: "Matricule invalide (DZ ex: 12345-123-16)"
+      });
+    }
 
-  const code = createCode();
+    const spot = spots.find(s => s.id == spotId);
+    if (!spot) return res.status(404).json({ error: "place introuvable" });
+    if (!spot.free) return res.status(400).json({ error: "place occupée" });
 
-  const reservation = {
-    code,
-    name,
-    carNumber,
-    spot,
-    createdAt: Date.now(),
-    entryTime: null,
-    exitTime: null,
-    reminderSent: false,
-    confirmed: false,
-    extraTime: 0,
-    total: 0,
-    advance: 50
-  };
+    spot.free = false;
 
-  reservations.push(reservation);
+    const code = createCode();
 
-  // QR
-  const qrPayload = JSON.stringify({ code });
-  const qrImage = await QRCode.toDataURL(qrPayload);
+    const reservation = {
+      code,
+      userId,
+      name,
+      carNumber,
+      spot,
+      createdAt: Date.now(),
+      entryTime: null,
+      exitTime: null,
+      cancelled: false
+    };
 
-  // PDF
-  const pdfPath = path.join(uploadDir, `${code}.pdf`);
-  const doc = new PDFDocument();
-  doc.pipe(fs.createWriteStream(pdfPath));
+    reservations.push(reservation);
 
-  doc.fontSize(22).text("🎫 Ticket Parking", { align: "center" }).moveDown();
-  doc.fontSize(14);
-  doc.text(`Nom : ${name}`);
-  doc.text(`Matricule : ${carNumber}`);
-  doc.text(`Section : ${spot.section}`);
-  doc.text(`Place : ${spot.number}`);
-  doc.text(`Étage : ${spot.floor}`);
-  doc.text(`Code : ${code}`);
-  doc.text(`Acompte payé : 50 DA`);
+    // ---------- send message to AUTH SERVICE ----------
+    await fetch("http://localhost:4001/send-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        text: `Votre code d'entrée parking est : ${code}`,
+        type: "reservation"
+      })
+    });
 
-  const qrBase64 = qrImage.split(",")[1];
-  const qrBuffer = Buffer.from(qrBase64, "base64");
-  doc.image(qrBuffer, 150, 300, { width: 200 });
+    // ---------- add to user reservation history ----------
+    await fetch("http://localhost:4001/add-reservation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        reservation
+      })
+    });
 
-  doc.end();
-
-  res.json({
-    message: "reservation ok",
-    code,
-    ticket: `http://localhost:32002/ticket/${code}`
-  });
+    res.json({
+      message: "reservation effectuée",
+      code
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "erreur serveur" });
+  }
 });
 
-// ------------------ ticket ------------------
-app.get("/ticket/:code", (req, res) => {
-  const pdf = path.join(uploadDir, `${req.params.code}.pdf`);
-  res.download(pdf);
-});
+// ------------------ ENTRY ------------------
 
-// ------------------ 👉 confirmer arrivée (+15 min) ------------------
-app.post("/confirm/:code", (req, res) => {
-  const r = reservations.find(x => x.code === req.params.code);
-  if (!r) return res.status(404).json({ error: "not found" });
-
-  r.confirmed = true;
-  r.extraTime = 15 * 60 * 1000; // 15 min en ms
-
-  res.json({ message: "arrivée confirmée" });
-});
-
-// ------------------ 👉 annuler réservation manuellement ------------------
-app.post("/cancel/:code", (req, res) => {
-  const r = reservations.find(x => x.code === req.params.code);
-  if (!r) return res.status(404).json({ error: "not found" });
-
-  const sp = spots.find(s => s.id === r.spot.id);
-  if (sp) sp.free = true;
-
-  r.cancelled = true;
-
-  res.json({ message: "réservation annulée" });
-});
-
-// ------------------ ENTRÉE ------------------
 app.post("/entry/:code", (req, res) => {
   const r = reservations.find(x => x.code === req.params.code);
-  if (!r) return res.status(404).json({ error: "not found" });
+
+  if (!r) return res.status(404).json({ error: "inconnu" });
 
   r.entryTime = Date.now();
+
   res.json({ message: "entrée enregistrée" });
 });
 
-// ------------------ SORTIE ------------------
+// ------------------ EXIT ------------------
+
 app.post("/exit/:code", (req, res) => {
   const r = reservations.find(x => x.code === req.params.code);
-  if (!r) return res.status(404).json({ error: "not found" });
 
-  if (!r.entryTime)
-    return res.status(400).json({ error: "pas encore entré" });
+  if (!r) return res.status(404).json({ error: "inconnu" });
 
   r.exitTime = Date.now();
 
-  const hours = Math.ceil((r.exitTime - r.entryTime) / (1000 * 60 * 60));
-  const pricePerHour = 100;
-
-  let total = hours * pricePerHour - r.advance;
-  if (total < 0) total = 0;
-
-  r.total = total;
-
-  // libérer la place
   const realSpot = spots.find(s => s.id === r.spot.id);
   if (realSpot) realSpot.free = true;
 
-  res.json({ total });
+  res.json({ message: "sortie enregistrée" });
 });
 
-// ------------------ AUTO GESTION TEMPS ------------------
+// ------------------ AUTO CANCEL ------------------
+
 setInterval(() => {
   const now = Date.now();
 
   reservations.forEach(r => {
     if (r.entryTime) return;
 
-    const elapsed = now - r.createdAt;
+    const diff = now - r.createdAt;
 
-    // rappel après 45 minutes
-    if (!r.reminderSent && elapsed >= 45 * 60 * 1000) {
-      r.reminderSent = true;
-
-      console.log(
-        "🔔 Rappel envoyé à",
-        r.name,
-        "code",
-        r.code,
-        "(confirmer l'arrivée sinon annulation)"
-      );
-    }
-
-    const allowed = 60 * 60 * 1000 + (r.extraTime || 0);
-
-    if (elapsed >= allowed) {
-      console.log("❌ Réservation annulée :", r.code);
-
-      const sp = spots.find(s => s.id === r.spot.id);
-      if (sp) sp.free = true;
-
+    // 1 heure
+    if (diff > 60 * 60 * 1000) {
       r.cancelled = true;
+
+      const realSpot = spots.find(s => s.id === r.spot.id);
+      if (realSpot) realSpot.free = true;
     }
   });
 
   reservations = reservations.filter(r => !r.cancelled);
+}, 60000);
 
-}, 60 * 1000);
-
-// ------------------ ADMIN ------------------
-app.get("/admin", (req, res) => {
-  const totalMoney = reservations.reduce((s, r) => s + (r.total || 0), 0);
-
-  res.json({
-    totalMoney,
-    reservations
-  });
+app.listen(4002, () => {
+  console.log("🅿️ Reservation service running on 4002");
 });
-app.get("/reservation/:code", (req, res) => {
-  const r = reservations.find(x => x.code === req.params.code);
-
-  if (!r) return res.status(404).json({ error: "not found" });
-
-  res.json(r);
-});
-
-app.listen(32002, () =>
-  console.log("📌 Reservation service running on 3002")
-);

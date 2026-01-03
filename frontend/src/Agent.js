@@ -1,91 +1,39 @@
 import { useState } from "react";
+import { RESERVATION } from "./api";
 
-export default function Agent() {
+export default function Agent(){
 
-  const [code, setCode] = useState("");
-  const [bill, setBill] = useState(null);
-  const [error, setError] = useState("");
+  const [code,setCode]=useState("");
 
-  async function entry() {
-    setError("");
-    setBill(null);
-
-    const res = await fetch(`http://localhost:32002/entry/${code}`, {
-      method: "POST"
-    });
-
-    const data = await res.json();
-
-    if (data.error) setError("Ticket inconnu");
-    else alert("Entrée enregistrée");
+  async function entry(){
+    await fetch(`${RESERVATION}/entry/${code}`,{method:"POST"});
+    alert("Entrée enregistrée");
   }
 
-  async function exit() {
-    setError("");
-
-    const res = await fetch(`http://localhost:32002/exit/${code}`, {
-      method: "POST"
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      setError(data.error);
-      return;
-    }
-
-    setBill(data);
+  async function exit(){
+    await fetch(`${RESERVATION}/exit/${code}`,{method:"POST"});
+    alert("Sortie enregistrée");
   }
 
-  return (
+  return(
     <div className="text-center">
 
-      {/* titre */}
-      <h2 className="text-2xl font-bold mb-4">
-        👮 Interface Agent
-      </h2>
+      <h2 className="text-2xl font-bold">Interface Agent</h2>
 
-      {/* carte */}
-      <div className="bg-white rounded-3xl shadow-lg p-8 mt-2 w-3/4 mx-auto">
+      <input className="border px-3 py-1"
+        placeholder="Code"
+        onChange={e=>setCode(e.target.value)} />
 
-        <div className="flex justify-center gap-3 items-center">
+      <button onClick={entry}
+        className="bg-blue-500 text-white px-3 py-1 rounded ml-2">
+        Entrée
+      </button>
 
-          <input
-            placeholder="Code du ticket"
-            onChange={e => setCode(e.target.value)}
-            className="border rounded-xl px-3 py-2 w-72"
-          />
+      <button onClick={exit}
+        className="bg-green-600 text-white px-3 py-1 rounded ml-2">
+        Sortie
+      </button>
 
-          <button
-            className="bg-green-500 text-white px-4 py-2 rounded-xl hover:scale-105 duration-200"
-            onClick={entry}
-          >
-            Scanner entrée
-          </button>
-
-          <button
-            className="bg-green-600 text-white px-4 py-2 rounded-xl hover:scale-105 duration-200"
-            onClick={exit}
-          >
-            Scanner sortie / Facture
-          </button>
-        </div>
-
-        {/* erreur */}
-        {error && (
-          <p className="text-red-600 font-semibold mt-3">
-            {error}
-          </p>
-        )}
-
-        {/* facture */}
-        {bill && (
-          <p className="mt-4 text-lg font-bold">
-            💰 Total à payer : {bill.total} DA
-          </p>
-        )}
-
-      </div>
     </div>
   );
 }

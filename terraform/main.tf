@@ -10,8 +10,8 @@ provider "kubernetes" {
   config_path = "~/.kube/config"
 }
 
-resource "kubernetes_namespace" "parking" {
+resource "kubernetes_namespace" "smart_parking" {
   metadata {
-    name = "parking"
+    name = "smart_parking"
   }
 }

@@ -1,85 +1,95 @@
 const express = require("express");
 const cors = require("cors");
+const fetch = require("node-fetch");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔹 réservations gardées en mémoire
-let reservations = [];
+// ------------------ IN MEMORY DATA ------------------
+
+let bills = [];
 let totalMoney = 0;
 
-// 🔹 API appelée par le service réservation pour enregistrer un ticket
-app.post("/reservation", (req, res) => {
-  const r = req.body;
+const PRICE_PER_HOUR = 100;
+const ADVANCE = 50;
 
-  r.startTime = null;  // pas encore entré
-  r.endTime = null;
-  r.total = 0;
+// ------------------ CALCUL BILL ------------------
 
-  reservations.push(r);
+app.post("/pay", async (req, res) => {
+  try {
+    const { userId, entryTime, exitTime } = req.body;
 
-  res.json({ ok: true });
-});
+    if (!userId || !entryTime || !exitTime)
+      return res.status(400).json({ error: "champs manquants" });
 
-// 🔹 agent marque ENTRÉE
-app.post("/enter", (req, res) => {
-  const { code } = req.body;
+    // duration hours rounded up
+    const hours =
+      Math.ceil((exitTime - entryTime) / (1000 * 60 * 60)) || 1;
 
-  const r = reservations.find(x => x.code === code);
+    let price = hours * PRICE_PER_HOUR;
 
-  if (!r) return res.json({ error: "Ticket inconnu" });
-  if (r.startTime) return res.json({ error: "Entrée déjà enregistrée" });
+    // ---------- ask auth service for user profile ----------
+    const profileRes = await fetch("http://localhost:4001/me-from-id", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId })
+    });
 
-  r.startTime = Date.now();
+    const user = await profileRes.json();
 
-  res.json({ message: "Entrée enregistrée" });
-});
+    let discount = 0;
 
-// 🔹 agent marque SORTIE + FACTURE + LIBÉRATION PLACE
-app.post("/exit", (req, res) => {
-  const { code } = req.body;
+    // 🎁 reduction every 5 reservations
+    if (user.points && user.points % 5 === 0) {
+      discount = 50;
+    }
 
-  const r = reservations.find(x => x.code === code);
+    // apply advance already paid
+    let total = price - ADVANCE - discount;
+    if (total < 0) total = 0;
 
-  if (!r) return res.json({ error: "Ticket inconnu" });
-  if (!r.startTime) return res.json({ error: "Entrée non enregistrée" });
+    const bill = {
+      id: Date.now(),
+      userId,
+      price,
+      advance: ADVANCE,
+      discount,
+      total,
+      hours,
+      createdAt: Date.now()
+    };
 
-  r.endTime = Date.now();
+    bills.push(bill);
+    totalMoney += total;
 
-  // durée arrondie à l'heure supérieure
-  const hours = Math.ceil((r.endTime - r.startTime) / (1000 * 60 * 60));
+    // ---------- notify user ----------
+    await fetch("http://localhost:4003/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        type: "billing",
+        text: `💰 Facture: ${hours}h • total payé ${total} DA (réduction ${discount} DA)`
+      })
+    });
 
-  const pricePerHour = 100;
-  const advance = 50;
-
-  const price = hours * pricePerHour;
-  const totalToPay = Math.max(price - advance, 0);
-
-  r.total = totalToPay;
-
-  totalMoney += totalToPay;
-
-  // 🔥🔥 libérer la place automatiquement 🔥🔥
-  if (r.spot) {
-    r.spot.free = true;
+    res.json(bill);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "erreur serveur" });
   }
-
-  res.json({
-    hours,
-    price,
-    advance,
-    totalToPay,
-    message: "Sortie enregistrée — place libérée"
-  });
 });
 
-// 🔹 admin dashboard
+// ------------------ ADMIN DASHBOARD ------------------
+
 app.get("/admin", (req, res) => {
   res.json({
     totalMoney,
-    reservations
+    bills
   });
 });
 
-app.listen(3003, () => console.log("🧾 Billing service running 3003"));
+app.listen(4004, () => {
+  console.log("💵 Billing service running on 4004");
+});

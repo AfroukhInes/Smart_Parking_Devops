@@ -1,17 +1,33 @@
 version: "3.9"
 
 services:
-  reservation:
-    build: ./reservation-service
-    ports:
-      - "3002:3002"
 
-  billing:
-    build: ./billing-service
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
     ports:
-      - "3003:3003"
+      - "4001:4001"
+
+  reservation-service:
+    build: ./reservation-service
+    container_name: reservation-service
+    ports:
+      - "4002:4002"
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    ports:
+      - "4003:4003"
+
+  billing-service:
+    build: ./billing-service
+    container_name: billing-service
+    ports:
+      - "4004:4004"
 
   frontend:
     build: ./frontend
+    container_name: frontend
     ports:
-      - "3000:80"
+      - "3000:3000"

@@ -1,13 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service
+  namespace: smart-parking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reservation
+  template:
+    metadata:
+      labels:
+        app: reservation
+    spec:
+      containers:
+      - name: reservation
+        image: YOUR_DOCKERHUB_USERNAME/reservation-service
+        ports:
+        - containerPort: 4002
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: reservation-service
-  namespace: parking
+  namespace: smart-parking
 spec:
   selector:
     app: reservation
-  type: NodePort
   ports:
-  - port: 3002
-    targetPort: 3002
-    nodePort: 32002
+  - port: 4002
+    targetPort: 4002
