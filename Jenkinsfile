@@ -47,9 +47,13 @@ pipeline {
     }
 
     stage('Deploy to Kubernetes') {
-      steps {
-        sh 'kubectl apply -f k8s/ --server=http://host.docker.internal:8001 --insecure-skip-tls-verify=true'
-      }
-    }
+  steps {
+    sh '''
+      kubectl apply -f k8s/namespace.yaml --server=http://host.docker.internal:8001 --insecure-skip-tls-verify=true
+      kubectl apply -f k8s/ --server=http://host.docker.internal:8001 --insecure-skip-tls-verify=true
+    '''
+  }
+}
+
   }
 }
