@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: billing
-        image: YOUR_DOCKERHUB_USERNAME/billing-service
+        image: ines234/billing-service
         ports:
         - containerPort: 4004
 ---
