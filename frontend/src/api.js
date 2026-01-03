@@ -1,4 +1,6 @@
-export const AUTH = "http://auth-service.smart-parking.svc.cluster.local:4001";
-export const RESERVATION = "http://reservation-service.smart-parking.svc.cluster.local:4002";
-export const NOTIF = "http://notification-service.smart-parking.svc.cluster.local:4003";
-export const BILLING = "http://billing-service.smart-parking.svc.cluster.local:4004";
+// URLs for Kubernetes NodePort services
+
+export const AUTH = "http://localhost:31564";
+export const RESERVATION = "http://localhost:32006";
+export const NOTIF = "http://localhost:32319";
+export const BILLING = "http://localhost:31173";
