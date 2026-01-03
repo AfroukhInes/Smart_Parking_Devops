@@ -1,13 +1,13 @@
-// Base NODE IP (from: kubectl get nodes -o wide)
+// 🔹 Node IP of your cluster (kubectl get nodes -o wide)
 const NODE_IP = "http://172.21.0.2";
 
-// NodePort mappings (from kubectl get svc -n smart-parking)
-export const AUTH_API = `${NODE_IP}:31564`;          // auth-nodeport
-export const RESERVATION_API = `${NODE_IP}:32006`;   // reservation-nodeport
-export const BILLING_API = `${NODE_IP}:31173`;       // billing-nodeport
-export const NOTIFICATION_API = `${NODE_IP}:32319`;  // notification-nodeport
+// 🔹 Services exposed via NodePort
+export const AUTH_API = `${NODE_IP}:31564`;          // auth
+export const RESERVATION_API = `${NODE_IP}:32006`;   // reservation
+export const BILLING_API = `${NODE_IP}:31173`;       // billing
+export const NOTIFICATION_API = `${NODE_IP}:32319`;  // notification
 
-// Example endpoints your React components will call:
+// 🔹 Main endpoints used by pages
 export const ENDPOINTS = {
   register: `${AUTH_API}/register`,
   login: `${AUTH_API}/login`,
@@ -16,8 +16,11 @@ export const ENDPOINTS = {
   notify: `${NOTIFICATION_API}/send`
 };
 
-// 🔥 compatibility exports (fix Jenkins error)
+// ✅ backward compatibility (fix Jenkins build)
 export const AUTH = AUTH_API;
 export const RESERVATION = RESERVATION_API;
 export const BILLING = BILLING_API;
 export const NOTIFICATION = NOTIFICATION_API;
+
+// 🔥 extra alias some files use
+export const NOTIF = NOTIFICATION_API;
