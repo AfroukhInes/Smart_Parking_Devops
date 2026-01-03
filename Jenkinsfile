@@ -48,7 +48,7 @@ pipeline {
 
     stage('Deploy to Kubernetes') {
       steps {
-        sh 'kubectl apply -f k8s/'
+        sh 'kubectl apply -f k8s/ --server=http://host.docker.internal:8001 --insecure-skip-tls-verify=true'
       }
     }
   }
